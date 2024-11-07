@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import tensorflow as tf
 import mnist_setup  # Import dataset and model setup from mnist_setup.py
 
@@ -25,7 +26,7 @@ def get_distributed_dataset():
     return dataset.with_options(options)
 
 
-# Prepare the dataset within strategy scope
+# Prepare the dataset and model within strategy scope
 with strategy.scope():
     multi_worker_dataset = get_distributed_dataset()
     multi_worker_model = mnist_setup.build_and_compile_cnn_model()
@@ -37,7 +38,21 @@ steps_per_epoch = 70  # Modify based on the dataset size
 backup_dir = "/tmp/backup"
 callbacks = [tf.keras.callbacks.BackupAndRestore(backup_dir=backup_dir)]
 
+# Measure training time
+start_time = time.time()
+
 # Train the model
-multi_worker_model.fit(
+history = multi_worker_model.fit(
     multi_worker_dataset, epochs=3, steps_per_epoch=steps_per_epoch, callbacks=callbacks
 )
+
+# Record training time
+training_time = time.time() - start_time
+
+# Evaluate the model on the same dataset
+test_loss, test_accuracy = multi_worker_model.evaluate(multi_worker_dataset)
+
+# Print results
+print("\nTraining Summary:")
+print(f"Training time: {training_time:.2f} seconds")
+print(f"Test Accuracy: {test_accuracy:.4f}")
